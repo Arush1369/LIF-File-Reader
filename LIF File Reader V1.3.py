@@ -1,7 +1,5 @@
 import os
 import csv
-import platform
-import subprocess
 from tkinter import Tk, Label, Button, StringVar, Frame, filedialog, messagebox
 from collections import defaultdict
 
@@ -93,21 +91,8 @@ def run_processing():
 
     save_results_to_csv(club_scores, destination)
 
-    # Ask to open the destination folder
-    result = messagebox.askquestion(
-        "Success",
-        f"CSV saved to:\n{destination}\n\nOpen containing folder?"
-    )
-    if result == 'yes':
-        folder_path = os.path.dirname(destination)
-        try:
-            os.startfile(folder_path)  # Windows
-        except AttributeError:
-            # For macOS/Linux fallback
-            if platform.system() == "Darwin":
-                subprocess.Popen(["open", folder_path])
-            else:
-                subprocess.Popen(["xdg-open", folder_path])
+    # Only show message; do not open folder
+    messagebox.showinfo("Success", f"CSV saved to:\n{destination}")
 
 # === GUI Setup ===
 
