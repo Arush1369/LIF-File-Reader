@@ -1,6 +1,7 @@
 import os
 import csv
-from tkinter import Tk, Label, Button, StringVar, Frame, filedialog, messagebox
+from tkinter import Tk, Label, Button, StringVar, Frame, filedialog, messagebox, Listbox
+
 from collections import defaultdict
 
 # === Data Processing Functions ===
@@ -60,6 +61,7 @@ def select_source_folder():
     path = filedialog.askdirectory(title="Select Folder with .lif Files")
     if path:
         source_var.set(path)
+        preview_data(path)  
 
 def select_destination_file():
     file_path = filedialog.asksaveasfilename(
@@ -69,6 +71,23 @@ def select_destination_file():
     )
     if file_path:
         destination_var.set(file_path)
+
+def preview_data(source):
+    club_scores = defaultdict(int)
+
+    for filename in os.listdir(source):
+        if filename.endswith('.lif'):
+            filepath = os.path.join(source, filename)
+            races = read_lif_file(filepath)
+            assign_points(races, club_scores)
+
+    sorted_scores = sorted(club_scores.items(), key=lambda x: x[1], reverse=True)
+
+    listbox.delete(0, 'end')
+
+    
+    for club, points in sorted_scores:
+        listbox.insert('end', f"{points:<5} points  {club}")
 
 def run_processing():
     source = source_var.get()
@@ -91,14 +110,29 @@ def run_processing():
 
     save_results_to_csv(club_scores, destination)
 
-    # Only show message; do not open folder
-    messagebox.showinfo("Success", f"CSV saved to:\n{destination}")
+    # Ask the user if they want to open the folder containing the saved CSV file
+    open_folder_response = messagebox.askyesno(
+        "Open Folder", 
+        f"CSV file saved to:\n{destination}\n\nDo you want to open the folder?"
+    )
+
+    if open_folder_response:
+        open_folder(destination)
+
+def open_folder(path):
+    
+    folder_path = os.path.dirname(path)
+    try:
+        os.startfile(folder_path)  
+    except Exception as e:
+        print(f"Error opening folder: {e}")
+        messagebox.showerror("Error", f"Unable to open folder: {e}")
 
 # === GUI Setup ===
 
 root = Tk()
 root.title("LIF Race Points Processor")
-root.geometry("700x280")
+root.geometry("700x400")
 root.resizable(False, False)
 
 # Variables
@@ -114,7 +148,11 @@ frame_source.pack(pady=5, fill='x', padx=20)
 Button(frame_source, text="Select Source Folder", command=select_source_folder, width=35).pack(side='left')
 Label(frame_source, textvariable=source_var, font=("Arial", 11), anchor='w', wraplength=400).pack(side='left', padx=10)
 
-# Destination file row
+# Preview Listbox 
+listbox = Listbox(root, width=60, height=10)
+listbox.pack(pady=10)
+
+# Destination file row 
 frame_dest = Frame(root)
 frame_dest.pack(pady=5, fill='x', padx=20)
 Button(frame_dest, text="Select Destination File Location and Name", command=select_destination_file, width=35).pack(side='left')
