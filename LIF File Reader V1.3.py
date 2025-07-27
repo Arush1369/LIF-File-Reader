@@ -1,7 +1,6 @@
 import os
 import csv
-import re
-from tkinter import Tk, Label, Button, StringVar, Frame, Entry, filedialog, messagebox, Listbox
+from tkinter import Tk, Label, Button, StringVar, Frame, filedialog, messagebox, Listbox, Entry
 from collections import defaultdict
 
 # === Data Processing Functions ===
@@ -26,15 +25,12 @@ def read_lif_file(filepath):
         else:
             if current_race:
                 current_race.append(line)
-
     if current_race:
         races.append(current_race)
-
     return races
 
 def assign_points(races, club_scores):
     points_table = [10, 7, 5, 3, 1]
-
     for race in races:
         for i, line in enumerate(race[1:6]):
             parts = line.split(",")
@@ -46,25 +42,34 @@ def assign_points(races, club_scores):
 
 def save_results_to_csv(scores, output_file):
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-
     with open(output_file, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Club Name', 'Points'])
-
         for club, points in sorted_scores:
             writer.writerow([club, points])
 
-def extract_year_from_name(name):
-    match = re.search(r'(19|20)\d{2}', name)
-    return int(match.group()) if match else None
+# === Helper Function for Year Filtering ===
+
+def should_include_folder(folder_name, min_year, max_year):
+    if not min_year and not max_year:
+        return True
+    try:
+        folder_year = int(''.join(filter(str.isdigit, folder_name)))
+        if min_year and folder_year < int(min_year):
+            return False
+        if max_year and folder_year > int(max_year):
+            return False
+    except ValueError:
+        return False
+    return True
 
 # === GUI Logic ===
 
 def select_source_folder():
-    path = filedialog.askdirectory(title="Select Parent Folder (Containing Year-Folders)")
+    path = filedialog.askdirectory(title="Select Folder with .lif Files")
     if path:
         source_var.set(path)
-        preview_data(path)  
+        preview_data(path)
 
 def select_destination_file():
     file_path = filedialog.asksaveasfilename(
@@ -75,29 +80,23 @@ def select_destination_file():
     if file_path:
         destination_var.set(file_path)
 
-def folder_is_in_range(folder_name, min_year, max_year):
-    year = extract_year_from_name(folder_name)
-    if min_year is None or max_year is None:
-        return True
-    if year is None:
-        return False
-    return min_year <= year <= max_year
-
 def preview_data(source):
+    if not source:
+        return
     club_scores = defaultdict(int)
 
-    try:
-        min_year = int(min_year_var.get()) if min_year_var.get() else None
-        max_year = int(max_year_var.get()) if max_year_var.get() else None
-    except ValueError:
-        return  # Skip preview if invalid year range
+    # Include files directly in source folder
+    if should_include_folder(os.path.basename(source), min_year_var.get(), max_year_var.get()):
+        for filename in os.listdir(source):
+            if filename.endswith('.lif'):
+                filepath = os.path.join(source, filename)
+                races = read_lif_file(filepath)
+                assign_points(races, club_scores)
 
+    # Include files in subfolders if folder name matches year
     for folder in os.listdir(source):
         folder_path = os.path.join(source, folder)
-        if not os.path.isdir(folder_path):
-            continue
-
-        if folder_is_in_range(folder, min_year, max_year):
+        if os.path.isdir(folder_path) and should_include_folder(folder, min_year_var.get(), max_year_var.get()):
             for filename in os.listdir(folder_path):
                 if filename.endswith('.lif'):
                     filepath = os.path.join(folder_path, filename)
@@ -105,21 +104,17 @@ def preview_data(source):
                     assign_points(races, club_scores)
 
     sorted_scores = sorted(club_scores.items(), key=lambda x: x[1], reverse=True)
-    listbox.delete(0, 'end')
 
-    for club, points in sorted_scores:
-        listbox.insert('end', f"{points:<5} points  {club}")
+    listbox.delete(0, 'end')
+    if not sorted_scores:
+        listbox.insert('end', "No results found for the selected year range.")
+    else:
+        for club, points in sorted_scores:
+            listbox.insert('end', f"{points:<5} points  {club}")
 
 def run_processing():
     source = source_var.get()
     destination = destination_var.get()
-
-    try:
-        min_year = int(min_year_var.get()) if min_year_var.get() else None
-        max_year = int(max_year_var.get()) if max_year_var.get() else None
-    except ValueError:
-        messagebox.showerror("Invalid Year", "Please enter valid numeric values for Min and Max Year.")
-        return
 
     if not source:
         messagebox.showerror("Missing Info", "Please select a source folder.")
@@ -130,12 +125,16 @@ def run_processing():
 
     club_scores = defaultdict(int)
 
+    if should_include_folder(os.path.basename(source), min_year_var.get(), max_year_var.get()):
+        for filename in os.listdir(source):
+            if filename.endswith('.lif'):
+                filepath = os.path.join(source, filename)
+                races = read_lif_file(filepath)
+                assign_points(races, club_scores)
+
     for folder in os.listdir(source):
         folder_path = os.path.join(source, folder)
-        if not os.path.isdir(folder_path):
-            continue
-
-        if folder_is_in_range(folder, min_year, max_year):
+        if os.path.isdir(folder_path) and should_include_folder(folder, min_year_var.get(), max_year_var.get()):
             for filename in os.listdir(folder_path):
                 if filename.endswith('.lif'):
                     filepath = os.path.join(folder_path, filename)
@@ -145,17 +144,16 @@ def run_processing():
     save_results_to_csv(club_scores, destination)
 
     open_folder_response = messagebox.askyesno(
-        "Open Folder", 
+        "Open Folder",
         f"CSV file saved to:\n{destination}\n\nDo you want to open the folder?"
     )
-
     if open_folder_response:
         open_folder(destination)
 
 def open_folder(path):
     folder_path = os.path.dirname(path)
     try:
-        os.startfile(folder_path)  
+        os.startfile(folder_path)
     except Exception as e:
         print(f"Error opening folder: {e}")
         messagebox.showerror("Error", f"Unable to open folder: {e}")
@@ -164,7 +162,7 @@ def open_folder(path):
 
 root = Tk()
 root.title("LIF Race Points Processor")
-root.geometry("700x480")
+root.geometry("700x500")
 root.resizable(False, False)
 
 # Variables
@@ -179,7 +177,7 @@ Label(root, text="LIF Race Points Processor", font=("Arial", 16, "bold")).pack(p
 # Source folder row
 frame_source = Frame(root)
 frame_source.pack(pady=5, fill='x', padx=20)
-Button(frame_source, text="Select Parent Folder (Containing Year Folders)", command=select_source_folder, width=40).pack(side='left')
+Button(frame_source, text="Select Source Folder", command=select_source_folder, width=35).pack(side='left')
 Label(frame_source, textvariable=source_var, font=("Arial", 11), anchor='w', wraplength=400).pack(side='left', padx=10)
 
 # Year range row
@@ -199,18 +197,17 @@ entry_max.bind("<KeyRelease>", lambda e: preview_data(source_var.get()))
 
 Label(root, text="(Leave year fields blank to include all folders)", font=("Arial", 9, "italic"), fg="gray").pack(pady=(0, 10))
 
-
-# Preview Listbox 
+# Preview Listbox
 listbox = Listbox(root, width=60, height=10)
 listbox.pack(pady=10)
 
-# Destination file row 
+# Destination file row
 frame_dest = Frame(root)
 frame_dest.pack(pady=5, fill='x', padx=20)
 Button(frame_dest, text="Select Destination File Location and Name", command=select_destination_file, width=35).pack(side='left')
 Label(frame_dest, textvariable=destination_var, font=("Arial", 11), anchor='w', wraplength=400).pack(side='left', padx=10)
 
-# Export to CSV button
+# Export button
 Button(root, text="Export to CSV", command=run_processing, bg="#4CAF50", fg="white", font=("Arial", 12), width=20).pack(pady=20)
 
 root.mainloop()
