@@ -197,6 +197,9 @@ entry_max = Entry(frame_years, textvariable=max_year_var, width=10)
 entry_max.pack(side='left')
 entry_max.bind("<KeyRelease>", lambda e: preview_data(source_var.get()))
 
+Label(root, text="(Leave year fields blank to include all folders)", font=("Arial", 9, "italic"), fg="gray").pack(pady=(0, 10))
+
+
 # Preview Listbox 
 listbox = Listbox(root, width=60, height=10)
 listbox.pack(pady=10)
