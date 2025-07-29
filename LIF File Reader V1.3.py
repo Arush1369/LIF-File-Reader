@@ -50,18 +50,14 @@ def save_results_to_csv(scores, output_file):
 
 # === Helper Function for Year Filtering ===
 
-def should_include_folder(folder_name, min_year, max_year):
-    if not min_year and not max_year:
+def should_include_folder(folder_name, year_filter):
+    if not year_filter:
         return True
     try:
         folder_year = int(''.join(filter(str.isdigit, folder_name)))
-        if min_year and folder_year < int(min_year):
-            return False
-        if max_year and folder_year > int(max_year):
-            return False
+        return folder_year == int(year_filter)
     except ValueError:
         return False
-    return True
 
 # === GUI Logic ===
 
@@ -84,19 +80,18 @@ def preview_data(source):
     if not source:
         return
     club_scores = defaultdict(int)
+    year = year_var.get()
 
-    # Include files directly in source folder
-    if should_include_folder(os.path.basename(source), min_year_var.get(), max_year_var.get()):
+    if should_include_folder(os.path.basename(source), year):
         for filename in os.listdir(source):
             if filename.endswith('.lif'):
                 filepath = os.path.join(source, filename)
                 races = read_lif_file(filepath)
                 assign_points(races, club_scores)
 
-    # Include files in subfolders if folder name matches year
     for folder in os.listdir(source):
         folder_path = os.path.join(source, folder)
-        if os.path.isdir(folder_path) and should_include_folder(folder, min_year_var.get(), max_year_var.get()):
+        if os.path.isdir(folder_path) and should_include_folder(folder, year):
             for filename in os.listdir(folder_path):
                 if filename.endswith('.lif'):
                     filepath = os.path.join(folder_path, filename)
@@ -107,7 +102,7 @@ def preview_data(source):
 
     listbox.delete(0, 'end')
     if not sorted_scores:
-        listbox.insert('end', "No results found for the selected year range.")
+        listbox.insert('end', "No results found for the selected year.")
     else:
         for club, points in sorted_scores:
             listbox.insert('end', f"{points:<5} points  {club}")
@@ -124,8 +119,9 @@ def run_processing():
         return
 
     club_scores = defaultdict(int)
+    year = year_var.get()
 
-    if should_include_folder(os.path.basename(source), min_year_var.get(), max_year_var.get()):
+    if should_include_folder(os.path.basename(source), year):
         for filename in os.listdir(source):
             if filename.endswith('.lif'):
                 filepath = os.path.join(source, filename)
@@ -134,7 +130,7 @@ def run_processing():
 
     for folder in os.listdir(source):
         folder_path = os.path.join(source, folder)
-        if os.path.isdir(folder_path) and should_include_folder(folder, min_year_var.get(), max_year_var.get()):
+        if os.path.isdir(folder_path) and should_include_folder(folder, year):
             for filename in os.listdir(folder_path):
                 if filename.endswith('.lif'):
                     filepath = os.path.join(folder_path, filename)
@@ -168,8 +164,7 @@ root.resizable(False, False)
 # Variables
 source_var = StringVar()
 destination_var = StringVar()
-min_year_var = StringVar()
-max_year_var = StringVar()
+year_var = StringVar()
 
 # Header
 Label(root, text="LIF Race Points Processor", font=("Arial", 16, "bold")).pack(pady=10)
@@ -180,22 +175,16 @@ frame_source.pack(pady=5, fill='x', padx=20)
 Button(frame_source, text="Select Source Folder", command=select_source_folder, width=35).pack(side='left')
 Label(frame_source, textvariable=source_var, font=("Arial", 11), anchor='w', wraplength=400).pack(side='left', padx=10)
 
-# Year range row
-frame_years = Frame(root)
-frame_years.pack(pady=5)
-Label(frame_years, text="Min Year:").pack(side='left', padx=5)
+# Year filter row
+frame_year = Frame(root)
+frame_year.pack(pady=5)
+Label(frame_year, text="Year:").pack(side='left', padx=5)
 
-entry_min = Entry(frame_years, textvariable=min_year_var, width=10)
-entry_min.pack(side='left')
-entry_min.bind("<KeyRelease>", lambda e: preview_data(source_var.get()))
+entry_year = Entry(frame_year, textvariable=year_var, width=10)
+entry_year.pack(side='left')
+entry_year.bind("<KeyRelease>", lambda e: preview_data(source_var.get()))
 
-Label(frame_years, text="Max Year:").pack(side='left', padx=5)
-
-entry_max = Entry(frame_years, textvariable=max_year_var, width=10)
-entry_max.pack(side='left')
-entry_max.bind("<KeyRelease>", lambda e: preview_data(source_var.get()))
-
-Label(root, text="(Leave year fields blank to include all folders)", font=("Arial", 9, "italic"), fg="gray").pack(pady=(0, 10))
+Label(root, text="(Leave blank to include all folders)", font=("Arial", 9, "italic"), fg="gray").pack(pady=(0, 10))
 
 # Preview Listbox
 listbox = Listbox(root, width=60, height=10)
