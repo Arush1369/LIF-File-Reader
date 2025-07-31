@@ -30,15 +30,55 @@ def read_lif_file(filepath):
     return races
 
 def assign_points(races, club_scores):
-    points_table = [10, 7, 5, 3, 1]
     for race in races:
-        for i, line in enumerate(race[1:6]):
+        results = []
+        for line in race[1:]:
             parts = line.split(",")
             if len(parts) > 5:
+                placing = parts[0].strip()
                 club_name = parts[5].strip()
-                if club_name:
-                    points = points_table[i]
-                    club_scores[club_name] += points
+                if placing.upper() in ("DQ", "DNS") or not club_name:
+                    continue
+                try:
+                    place = int(placing)
+                except ValueError:
+                    continue
+                results.append((place, club_name))
+
+        results.sort()
+        i = 0
+        while i < len(results):
+            tied_clubs = [results[i][1]]
+            place = results[i][0]
+            j = i + 1
+            while j < len(results) and results[j][0] == place:
+                tied_clubs.append(results[j][1])
+                j += 1
+
+            if place == 1:
+                points = 8
+            elif place == 2:
+                points = 7
+            elif place == 3:
+                points = 6
+            elif place == 4:
+                points = 5
+            elif place == 5:
+                points = 4
+            elif place == 6:
+                points = 3
+            elif place == 7:
+                points = 2
+            elif place == 8:
+                points = 1
+            else:
+                points = 1
+
+            for club in tied_clubs:
+                club_scores[club] += points
+
+            i = j
+
 
 def save_results_to_csv(scores, output_file):
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
